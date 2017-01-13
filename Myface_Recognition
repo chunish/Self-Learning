@@ -1,0 +1,256 @@
+/*
+	步骤：
+	1.收集att_faces
+	2.收集训练对象——目标人照片10张并建成文件夹s41
+	3.对s41的十张图片进行人脸检测ROI分割，并将尺寸设置与前40一致
+	4.生成csv文件
+	5.检测csv文件，并验证正确性
+	6.读取标签，训练模型
+	7.训练模型
+
+	常量介绍：
+
+
+
+*/
+
+
+#include<opencv\cv.h>
+#include<opencv\highgui.h>
+#include<opencv2\opencv.hpp>
+#include<opencv\cxcore.h>
+#include<opencv2\imgproc\imgproc.hpp>
+#include<opencv2\core\core.hpp>
+#include<iostream>
+#include<fstream>
+#include<string>
+#include<sstream>
+#include<math.h>
+using namespace cv;
+using namespace std;
+
+string  face_cascade_name = "haarcascade_frontalface_default.xml";
+string  eyes_cascade_name = "haarcascade_eye_tree_eyeglasses.xml";
+
+CascadeClassifier face_cascade, eyes_cascade;
+
+//CascadeClassifier face_cascade, eyes_cascade;
+//检测学习数据集，并分割ROI
+
+
+
+
+
+Mat facedetect(Mat frame)
+{
+	if (!face_cascade.load(face_cascade_name))
+	{
+		cout << "--(!)Error loading face cascade\n";
+		//return -1;
+	}
+	if (!eyes_cascade.load(eyes_cascade_name))
+	{
+		cout << "--(!)Error loading face cascade\n";
+		//return -1;
+	}
+	else
+	{
+		vector<Rect> faces;
+		Mat frame_gray;
+
+		cvtColor(frame, frame_gray, COLOR_BGR2GRAY);
+		equalizeHist(frame_gray, frame_gray);
+
+		//-- Detect faces  
+		face_cascade.detectMultiScale(frame_gray, faces, 1.1, 3, 0/* CV_HAAR_DO_ROUGH_SEARCH, Size(10, 20), Size(2000, 7000)*/);
+
+		for (size_t j = 0; j < faces.size(); j++)
+		{
+			Mat faceROI = frame(faces[j]);
+			Mat MyFace;
+			if (faceROI.cols)
+			{
+				resize(faceROI, MyFace, Size(92, 112));
+				//----------Eyes detection
+				vector<Rect> eyes;
+				eyes_cascade.detectMultiScale(faceROI, eyes, 1.1, 1, CV_HAAR_DO_ROUGH_SEARCH, Size(1, 1));
+				
+				if (eyes.size()!=NULL) return MyFace;
+			}
+			else cout << "faceROI error!" << endl;
+		}
+	}
+}
+
+void att_s41_faces_get(void)
+{
+	for (size_t i = 1; i < 11; i++)
+	{
+		string frame_names = format("D:\\Shen\\Desktop\\p-s41\\%d.jpg", i);
+		Mat frame = imread(frame_names);
+		//imshow(frame_names,frame);
+		Mat newf = facedetect(frame);
+
+		string  str = format("E:\\Visual studio Projects\\Harr_Face_Recog\\Harr_Face_Recog\\att_faces\\s41\\Myface%d.jpg", i);
+		imwrite(str, newf); 
+		imshow(str, newf);
+		cout << "The Num is " << "  " << i << endl;
+		
+		/*string  str1 = format("E:\\Visual studio Projects\\Harr_Face_Recog\\Harr_Face_Recog\\att_faces\\s41\\MyfaceA%d.jpg", i);
+		imwrite(str1, frame);*/
+		frame = NULL;
+	}
+}
+
+
+//-----Model Training
+
+
+//--------------使用csv文件读取图像和标签
+static void csv_read(const string& filename, vector<Mat>& images, vector<int>& labels, char separator = ';')
+{
+	
+	ifstream file(filename/*.c_str*/,ifstream::in);
+	if (!file)
+	{
+		string error_message = "No valid input file was given.";
+		CV_Error(CV_StsBadArg,error_message);
+	}
+	string line, path, classlabel;
+	while (getline(file,line))
+	{
+		stringstream liness(line);
+		getline(liness, path, separator);
+		getline(liness, classlabel);
+		if (!path.empty() && !classlabel.empty())
+		{
+			images.push_back(imread(path,0));
+			int num=atoi(classlabel.c_str());
+			cout << num<<endl;
+			labels.push_back(num);
+			//cout << labels.push_back(num);
+		}
+	}
+	//cout << atoi(classlabel.c_str());
+	waitKey(0);
+}
+
+//--------------Model train
+
+void model_train()
+{
+	string fn_csv = "E:\\Visual studio Projects\\Harr_Face_Recog\\Harr_Face_Recog\\att_faces\\at.txt";//csv文件位置
+	vector<int> labels;
+	vector<Mat> images;//容器，存放图像和标签
+
+	//csv_read(fn_csv, images, labels);
+
+
+	//读取数据
+	try
+	{
+		csv_read(fn_csv, images, labels);
+		cout << "Congratulations! The csv has been readed!" << endl;
+	}
+	catch (Exception& e)
+	{
+		cerr << "Error opening file\"" << fn_csv << "\".Reason:" << e.msg << endl;
+		exit(1);
+	}
+
+	if (images.size()<=1)
+	{
+		string error_message = "This demo need at least 2 images, please add more images to your data set!";
+		CV_Error(CV_StsError,error_message);
+	}
+
+
+	//Mat testSample = images[images.size() - 1];
+	//int testLabel = labels[labels.size() - 1];
+	/*images.pop_back();
+	labels.pop_back();*/
+	Ptr<FaceRecognizer> model = createEigenFaceRecognizer();
+	model->train(images, labels);
+	model->save("MyFacePCAModel.xml");
+
+	Ptr<FaceRecognizer> model1 = createFisherFaceRecognizer();
+	model1->train(images, labels);
+	model1->save("MyFaceFisherModel.xml");
+
+	Ptr<FaceRecognizer> model2 = createLBPHFaceRecognizer();
+	model2->train(images, labels);
+	model2->save("MyFaceLBPHModel.xml");
+
+	/*int predictedLabel = model->predict(testSample);
+	int predictedLabel1 = model1->predict(testSample);
+	int predictedLabel2 = model2->predict(testSample);
+
+	string result_message = format("Predicted class = %d / Actual class = %d.", predictedLabel, testLabel);
+	string result_message1 = format("Predicted class = %d / Actual class = %d.", predictedLabel1, testLabel);
+	string result_message2 = format("Predicted class = %d / Actual class = %d.", predictedLabel2, testLabel);
+	cout << result_message << endl;
+	cout << result_message1 << endl;
+	cout << result_message2 << endl;*/
+
+	//waitKey(0);
+	//return 0;
+}
+
+
+//----------------大BOSS  Face Recognition
+void face_recog()
+{
+	VideoCapture cap(0);
+	Mat frame, edges, gray;
+	CascadeClassifier cascade;
+	cascade.load("haarcascade_frontalface_alt.xml");
+	Ptr<FaceRecognizer>ModelPCA = createEigenFaceRecognizer();
+	ModelPCA->load("MyFacePCAModel.xml");
+	while (1)
+	{
+		cap >> frame;
+		vector<Rect> faces(0);
+		cvtColor(frame, gray, CV_BGR2GRAY);
+		equalizeHist(gray, gray);
+
+		cascade.detectMultiScale(gray, faces, 1.1, 2, 0 | CV_HAAR_SCALE_IMAGE, Size(30, 30));
+
+		Mat face;
+		Point text_lb;
+
+		for (size_t i = 0; i < faces.size(); i++)
+		{
+			if (faces[i].height>0&&faces[i].width>0)
+			{
+				face = gray(faces[i]);
+				text_lb = Point(faces[i].x,faces[i].y);
+				rectangle(frame,faces[i], Scalar(0,255,255),1,8,0);
+
+			}
+		}
+		Mat face_test;
+		int predictPCA = 0;
+		if (face.rows > 120) resize(face,face_test,Size(92,112));
+		if (!face_test.empty()) predictPCA = ModelPCA->predict(face_test);
+		cout << predictPCA << endl;
+		if (predictPCA==35)
+		{
+			string name = "Kris Shen";
+			putText(frame,name,text_lb,FONT_HERSHEY_COMPLEX,0.7,Scalar(127,0,255));
+
+		}
+		imshow("face",frame);
+		if (waitKey(27) >= 0) break;
+		//return 0;
+	}
+}
+
+int main()
+{
+	//att_s41_faces_get();
+
+	//model_train();
+	face_recog();
+	waitKey(0);
+	return 0;
+}
