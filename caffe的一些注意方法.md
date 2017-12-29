@@ -134,16 +134,16 @@ layer {
 ### 视觉层
 
 1. `param`
-	- `lr_mult`
-	- `decay_mult`
+	- `lr_mult`	学习速率
+	- `decay_mult`	权值衰减，避免overfiting
 2. `convolution_param`
 	- `num_output`
 	- `kernel_size`
 	- `pad`
 	- `stride`
-	- `bias_filter`
-		- `type`
-	- `weight_filter`
+	- `bias_filter`偏执项初始化
+		- `type`weight常见的有constant，xavier,gaussian，bias常见constant
+	- `weight_filter`权值初始化
 		- `std`
 
 3. `lrn_param`
