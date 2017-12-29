@@ -76,126 +76,97 @@ inclulde：			#指定属训练阶段or测试阶段
 Transformations:	#数据的预处理，scale为0.00390625，即是1/255, 即将输入数据由0-255归一化到0-1之间
 
 
+## Layer的设置方法
+
+```python
+name:				#表示该层的名称，可以随意命名
+type:				#层类型，主要有：Convolution, Data, pooling
+bottom/top:			#输入/输出
+data/label: 		#data层中，双输出
+inclulde：			#指定属训练阶段or测试阶段
+Transformations:	#数据的预处理，scale为0.00390625，即是1/255, 即将输入数据由0-255归一化到0-1之间
+
+
 ```
-**卷积层**
-```protobuf
-layer
-{
-	name: "conv2"
-    type: "Convolution"
-    bottom: "norm1"
-    top: "conv2"
-    convolution_param 
-    {
-      num_output: 256
-      pad: 2
-      kernel_size: 5
-      group: 2
-    }
-}
-```
-**池化层**
-```protobuf
-@ poollayer
-layer 
-    {
-	      name: "pool5"
-	      type: "Pooling"
-	      bottom: "conv5"
-	      top: "pool5"
-	      pooling_param 
-      {
-	        pool: MAX
-	        kernel_size: 3
-	        stride: 2
-      }
-    }
-```
-**激活层**
-```protobuf
-layer 
-    {
-      name: "relu1"
-      type: "ReLU"
-      bottom: "conv1"
-      top: "conv1"
-    }
-```
-**LRN**
-```protobuf
-layer 
-    {
-      name: "norm1"
-      type: "LRN"
-      bottom: "pool1"
-      top: "norm1"
-      lrn_param 
-      {
-        local_size: 5
-        alpha: 0.0001
-        beta: 0.75
-      }
-    }
-```
-**Full Connect**
-```protobuf
-layer 
-    {
-      name: "fc6"
-      type: "InnerProduct"
-      bottom: "pool5"
-      top: "fc6"
-      inner_product_param 
-      {
-        num_output: 4096
-      }
-    }
-```
-**DropOut**
-```protobuf
-layer 
-{
-  name: "drop6"
-  type: "Dropout"
-  bottom: "fc6"
-  top: "fc6"
-  dropout_param 
-  {
-    dropout_ratio: 0.5
+
+
+
+### 输入数据层
+ | 数据来源 | type|必选项|
+ |:---:|:--:|:---
+ |数据库（lmdb，leveldb等）|"Data"|batch_size, source|
+ |内存|"MemoryData"|batch_size, channels, width,height
+ |HDF5|"HDF5Data"|batch_size
+ |图片|"ImageData"|batch_size, source
+ |Windows|"WindowData"|batch_size, source
+
+> 其中
+> 1. batch_size每次处理的数据个数
+> 2. source， 包含数据的路径
+> 3. backend， leveldb/lmdb两种常见
+
+```python
+layer {
+  name: "cifar"
+  type: "Data"
+  top: "data"
+  top: "label"
+  include {
+    phase: TRAIN
+  }
+  transform_param {
+    scale: 0.00390625 #1/256
+    mean_file: "examples/cifar10/mean.binaryproto"
+  }
+  data_param {
+    source: "examples/cifar10/cifar10_train_lmdb"
+     # 用一个配置文件来进行均值操作
+    mirror: 1  # 1表示开启镜像，0表示关闭，也可用ture和false来表示
+    # 剪裁一个 227*227的图块，在训练阶段随机剪裁，在测试阶段从中间裁剪
+    crop_size: 227
+    batch_size: 100
+    backend: LMDB
   }
 }
 ```
-**SoftMax**
-```protobuf
-layer 
-    {
-      name: "prob"
-      type: "Softmax"
-      bottom: "fc8"
-      top: "prob"
-    }
+
+---
+### 视觉层
+
+1. `param`
+	- `lr_mult`
+	- `decay_mult`
+2. `convolution_param`
+	- `num_output`
+	- `kernel_size`
+	- `pad`
+	- `stride`
+	- `bias_filter`
+		- `type`
+	- `weight_filter`
+		- `std`
+
+3. `lrn_param`
+	- `local_size`
+	- `alpha`
+	- `beta`
+	- `norm_region`
+
+4. `inner_production_param`
+	- ``
+
+		- 
+
+##### 卷积层
+
+```python
+
 ```
-**Accuracy**
-```protobuf
-layer 
-    {
-      name: "accuracy"
-      type: "Accuracy"
-      bottom: "prob"
-      bottom: "label"
-      top: "accuracy"
-    }
+
+
+---
+#### pool层
+
+```python
+
 ```
-**Loss**
-```protobuf
-layer 
-    {
-	name: "loss"
-      type: "SoftmaxWithLoss"
-      bottom: "fc8"
-      bottom: "label"
-      top: "loss"
-    }
-```
-  
-    
