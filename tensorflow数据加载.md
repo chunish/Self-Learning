@@ -61,6 +61,9 @@ with tf.Session() as sess:
     file_queue = tf.train.slice_input_producer([path, label], shuffle=True, num_epochs=5)
     img_content = tf.read_file(file_queue[0])
     img_data = tf.image.decode_jpeg(img_content, channels=3)
+    img_resize = tf.image.resize_images(img_data, [img_w, img_h])
+    img_standard = tf.image.per_image_standardization(img_resize)
+    img_batch, label_batch = tf.train.batch([img_standard, label_queue], batch_size=batch_size)
     label_data = file_queue[1]
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
